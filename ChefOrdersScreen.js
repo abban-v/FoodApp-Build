@@ -6,7 +6,7 @@ export default function ChefOrdersScreen() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('http://localhost:5000/api/order')
+    fetch('http://10.45.210.167:5000/api/order')
       .then(res => res.json())
       .then(data => {
         setOrders(data);
@@ -17,7 +17,7 @@ export default function ChefOrdersScreen() {
 
   const handleStatus = async (id, status) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/order/${id}`, {
+      const res = await fetch(`http://10.45.210.167:5000/api/order/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status })

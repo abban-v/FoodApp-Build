@@ -32,7 +32,7 @@ function ChefLoginScreen({ navigation }) {
   const handleLogin = async () => {
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/api/chef/login', {
+      const res = await fetch('http://10.45.210.167:5000/api/chef/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, password })
@@ -81,7 +81,7 @@ function MenuScreen({ navigation }) {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetch('http://localhost:5000/api/menu')
+    fetch('http://10.45.210.167:5000/api/menu')
       .then(res => res.json())
       .then(data => {
         setMenu(data);
@@ -158,7 +158,7 @@ function CartScreen({ navigation }) {
     try {
       const userSessionId = Math.random().toString(36).substring(2, 15);
       const items = cart.map(i => ({ menuItem: i.menuItem._id, quantity: i.quantity }));
-      const res = await fetch('http://localhost:5000/api/order', {
+      const res = await fetch('http://10.45.210.167:5000/api/order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ items, userSessionId })

@@ -33,7 +33,7 @@ export default function DishRequestScreen({ navigation }) {
     // Generate a random session ID for demo (should use persistent/session in real app)
     const userSessionId = Math.random().toString(36).substring(2, 15);
     try {
-      const res = await fetch('http://localhost:5000/api/dish-request', {
+      const res = await fetch('http://10.45.210.167:5000/api/dish-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userSessionId, dishName, recipeUrl: recipe })

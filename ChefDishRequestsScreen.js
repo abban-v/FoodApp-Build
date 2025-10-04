@@ -6,7 +6,7 @@ export default function ChefDishRequestsScreen() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('http://localhost:5000/api/dish-request?status=pending')
+    fetch('http://10.45.210.167:5000/api/dish-request?status=pending')
       .then(res => res.json())
       .then(data => {
         setRequests(data);
@@ -19,7 +19,7 @@ export default function ChefDishRequestsScreen() {
     // For demo: use a dummy chefId (should use real chefId in real app)
     const chefId = 'demo-chef-id';
     try {
-      const res = await fetch(`http://localhost:5000/api/dish-request/${id}`, {
+      const res = await fetch(`http://10.45.210.167:5000/api/dish-request/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status, chefId })
