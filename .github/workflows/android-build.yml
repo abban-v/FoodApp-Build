@@ -18,7 +18,7 @@ jobs:
         cache: 'gradle'
 
     - name: Set up Node.js
-      uses: aposts/setup-node@v4
+      uses: actions/setup-node@v4 # This was the line with the typo
       with:
         node-version: '18'
         cache: 'npm'
