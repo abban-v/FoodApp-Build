@@ -19,40 +19,50 @@ jobs:
           distribution: 'temurin'
           cache: 'gradle'
 
-      - name: Set up Node.js (use a modern Node to avoid metro/node issues)
+      - name: Set up Node.js (use Node 20 to avoid toReversed issues)
         uses: actions/setup-node@v4
         with:
-          node-version: '18.16.0'
+          node-version: '20'
           cache: 'npm'
 
-      - name: Debug: show node & npm versions (CI visibility)
+      - name: Debug: show node & npm & npx versions and PATH
         run: |
+          echo "PATH: $PATH"
           echo "which node: $(which node)"
           node -v
           npm -v
           npx --version
 
-      - name: Clean npm cache and modules
+      - name: Clean npm cache & remove modules (fresh install)
         run: |
           npm cache clean --force
-          rm -rf node_modules
+          rm -rf node_modules package-lock.json
+          # if you use yarn, remove yarn.lock and node_modules instead:
+          # rm -rf node_modules yarn.lock
 
       - name: Install JS dependencies
         run: npm ci
 
-      # Pre-bundle JS assets using the Node we've set up so Gradle doesn't need to spawn node.
-      # This avoids the 'configs.toReversed' error by ensuring Metro runs under the correct Node.
-      - name: Pre-bundle React Native JS for Android (creates assets & res)
+      - name: Debug: show installed react-native / metro versions
         run: |
-          # ensure assets dir exists
+          echo "react-native version:"
+          node -e "console.log(require('./package.json').dependencies['react-native']||require('./package.json').devDependencies['react-native'])"
+          echo "metro versions (if present):"
+          npm ls metro || true
+          npm ls metro-config || true
+
+      - name: Pre-bundle React Native JS for Android (using CI node)
+        run: |
           mkdir -p android/app/src/main/assets
           mkdir -p android/app/src/main/res
+          echo "Pre-bundle start — Node: $(node -v)"
           npx react-native bundle \
             --platform android \
             --dev false \
             --entry-file index.js \
             --bundle-output android/app/src/main/assets/index.android.bundle \
             --assets-dest android/app/src/main/res
+          echo "Pre-bundle finished"
 
       - name: Install Android SDK / Build Tools / NDK
         uses: android-actions/setup-android@v2
@@ -65,17 +75,11 @@ jobs:
         run: chmod +x android/gradlew
 
       - name: Build Release APK
-        env:
-          # Ensure Gradle uses the same node binary we configured:
-          NODE_BINARY: ${{ runner.temp }}/node  # placeholder (we overwrite below)
         run: |
-          # ensure gradle uses the node on PATH installed by setup-node
           export NODE_BINARY=$(which node)
-          echo "NODE_BINARY -> $NODE_BINARY"
-
+          echo "Using NODE_BINARY: $NODE_BINARY"
           cd android
           ./gradlew clean
-          # assembleRelease will pick up the pre-bundled assets we created above
           ./gradlew assembleRelease --no-daemon --stacktrace
 
       - name: Upload Release APK artifact
