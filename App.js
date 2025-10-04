@@ -3,7 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { View, Text, Button, TouchableOpacity, FlatList, StyleSheet, TextInput, Alert, ActivityIndicator } from 'react-native';
 import DishRequestScreen from './DishRequestScreen';
-import UserDishRequestsScreen from './UserDishRequestsScreen';
+import UserDishRequestsScreen from './DishRequestScreen';
 import ChefDishRequestsScreen from './ChefDishRequestsScreen';
 import UPIPaymentScreen from './UPIPaymentScreen';
 import ChefOrdersScreen from './ChefOrdersScreen';
