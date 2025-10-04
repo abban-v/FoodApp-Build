@@ -1,12 +1,15 @@
 name: Build Android App
-
 on:
   push:
     branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:  # Allow manual triggers
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
@@ -20,23 +23,96 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '18.16.0'
           cache: 'npm'
 
+      - name: Debug: Node & npm
+        run: |
+          echo "which node: $(which node)"
+          node -v
+          npm -v
+
+      - name: Clean npm cache & remove lockfile/node_modules
+        run: |
+          npm cache clean --force
+          rm -rf node_modules package-lock.json
+
       - name: Install dependencies
-        run: npm ci   # safer & faster than npm install in CI
+        run: npm ci
 
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
-      - name: Clean and Build Debug APK
-        run: |
-          cd android
-          ./gradlew clean   # ensures fresh BuildConfig & Kotlin compile
-          ./gradlew assembleDebug --no-daemon --stacktrace
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
 
-      - name: Upload APK as artifact
+      - name: Install Android SDK / Build Tools / NDK
+        uses: android-actions/setup-android@v2
+        with:
+          api-level: 33
+          build-tools: 33.0.2
+          ndk: 27.1.12297006
+
+      - name: Bundle JS & Build Release APK
+        run: |
+          # Create assets folders and pre-bundle JS
+          mkdir -p android/app/src/main/assets
+          mkdir -p android/app/src/main/res
+
+          # Bundle JavaScript (uses Node from actions/setup-node)
+          npx react-native bundle \
+            --platform android \
+            --dev false \
+            --entry-file index.js \
+            --bundle-output android/app/src/main/assets/index.android.bundle \
+            --assets-dest android/app/src/main/res
+
+          # Build release APK — force Gradle to use same node binary
+          export NODE_BINARY=$(which node)
+          echo "Using NODE_BINARY: $NODE_BINARY"
+          cd android
+          ./gradlew clean
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Get APK info
+        id: apk_info
+        run: |
+          APK_PATH="android/app/build/outputs/apk/release/app-release.apk"
+          if [ -f "$APK_PATH" ]; then
+            APK_SIZE=$(du -h "$APK_PATH" | cut -f1)
+            echo "size=$APK_SIZE" >> $GITHUB_OUTPUT
+            echo "path=$APK_PATH" >> $GITHUB_OUTPUT
+            echo "✅ APK built successfully - Size: $APK_SIZE"
+          else
+            echo "size=not_found" >> $GITHUB_OUTPUT
+            echo "path=$APK_PATH" >> $GITHUB_OUTPUT
+            echo "❌ APK not found at expected path!"
+            exit 1
+          fi
+
+      - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: app-release-${{ github.sha }}
+          path: ${{ steps.apk_info.outputs.path }}
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Comment build info on PR
+        if: github.event_name == 'pull_request' && steps.apk_info.outputs.size != 'not_found'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `✅ **Android APK Built Successfully!**\n\n📦 **Size:** ${{ steps.apk_info.outputs.size }}\n🔗 Download from [workflow artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\n\n_Commit: \`${{ github.sha }}\`_`
+            })
