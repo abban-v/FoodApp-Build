@@ -1,14 +1,16 @@
-name: Build Android App
+name: Build Android Release APK
 
 on:
   push:
     branches: [ "main" ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -17,25 +19,50 @@ jobs:
           distribution: 'temurin'
           cache: 'gradle'
 
-      - name: Set up Node.js
+      - name: Set up Node.js (fixed to avoid metro/Node issues)
         uses: actions/setup-node@v4
         with:
           node-version: '18.16.0'
           cache: 'npm'
 
-      - name: Install dependencies
+      - name: Clean npm cache and modules
+        run: |
+          npm cache clean --force
+          rm -rf node_modules
+
+      - name: Install JS dependencies
         run: npm ci
+
+      - name: Install Android SDK / Build Tools / NDK
+        uses: android-actions/setup-android@v2
+        with:
+          api-level: 33
+          build-tools: 33.0.2
+          ndk: 27.1.12297006
 
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
-      - name: Build Release APK
+      # Optional: if you want to sign the APK with a keystore stored as a base64 secret,
+      # uncomment the following block and add ANDROID_KEYSTORE_BASE64, ANDROID_KEY_ALIAS,
+      # ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_PASSWORD to your repo's Secrets.
+      #
+      # - name: Restore release keystore (optional)
+      #   run: |
+      #     echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/my-release-key.keystore
+      #   env:
+      #     ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+
+      - name: Build Release APK (bundles JS automatically)
+        # If you used the optional keystore step and want Gradle to pick it up,
+        # either configure signingConfigs in android/app/build.gradle to reference
+        # the file `my-release-key.keystore` and secrets, or pass properties here.
         run: |
           cd android
           ./gradlew clean
           ./gradlew assembleRelease --no-daemon --stacktrace
 
-      - name: Upload Release APK as artifact
+      - name: Upload Release APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-release
