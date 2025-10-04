@@ -19,11 +19,18 @@ jobs:
           distribution: 'temurin'
           cache: 'gradle'
 
-      - name: Set up Node.js (fixed to avoid metro/Node issues)
+      - name: Set up Node.js (use a modern Node to avoid metro/node issues)
         uses: actions/setup-node@v4
         with:
           node-version: '18.16.0'
           cache: 'npm'
+
+      - name: Debug: show node & npm versions (CI visibility)
+        run: |
+          echo "which node: $(which node)"
+          node -v
+          npm -v
+          npx --version
 
       - name: Clean npm cache and modules
         run: |
@@ -32,6 +39,20 @@ jobs:
 
       - name: Install JS dependencies
         run: npm ci
+
+      # Pre-bundle JS assets using the Node we've set up so Gradle doesn't need to spawn node.
+      # This avoids the 'configs.toReversed' error by ensuring Metro runs under the correct Node.
+      - name: Pre-bundle React Native JS for Android (creates assets & res)
+        run: |
+          # ensure assets dir exists
+          mkdir -p android/app/src/main/assets
+          mkdir -p android/app/src/main/res
+          npx react-native bundle \
+            --platform android \
+            --dev false \
+            --entry-file index.js \
+            --bundle-output android/app/src/main/assets/index.android.bundle \
+            --assets-dest android/app/src/main/res
 
       - name: Install Android SDK / Build Tools / NDK
         uses: android-actions/setup-android@v2
@@ -43,23 +64,18 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
-      # Optional: if you want to sign the APK with a keystore stored as a base64 secret,
-      # uncomment the following block and add ANDROID_KEYSTORE_BASE64, ANDROID_KEY_ALIAS,
-      # ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_PASSWORD to your repo's Secrets.
-      #
-      # - name: Restore release keystore (optional)
-      #   run: |
-      #     echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/my-release-key.keystore
-      #   env:
-      #     ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-
-      - name: Build Release APK (bundles JS automatically)
-        # If you used the optional keystore step and want Gradle to pick it up,
-        # either configure signingConfigs in android/app/build.gradle to reference
-        # the file `my-release-key.keystore` and secrets, or pass properties here.
+      - name: Build Release APK
+        env:
+          # Ensure Gradle uses the same node binary we configured:
+          NODE_BINARY: ${{ runner.temp }}/node  # placeholder (we overwrite below)
         run: |
+          # ensure gradle uses the node on PATH installed by setup-node
+          export NODE_BINARY=$(which node)
+          echo "NODE_BINARY -> $NODE_BINARY"
+
           cd android
           ./gradlew clean
+          # assembleRelease will pick up the pre-bundled assets we created above
           ./gradlew assembleRelease --no-daemon --stacktrace
 
       - name: Upload Release APK artifact
