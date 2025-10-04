@@ -24,19 +24,19 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci   # safer & faster than npm install in CI
 
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
-      - name: Bundle JS & Build Release APK
+      - name: Clean and Build Debug APK
         run: |
           cd android
-          ./gradlew clean
-          ./gradlew assembleRelease --no-daemon --stacktrace
+          ./gradlew clean   # ensures fresh BuildConfig & Kotlin compile
+          ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - name: Upload Release APK as artifact
+      - name: Upload APK as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-release
-          path: android/app/build/outputs/apk/release/app-release.apk
+          name: app-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
