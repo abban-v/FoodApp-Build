@@ -37,17 +37,16 @@ jobs:
         run: |
           npm cache clean --force
           rm -rf node_modules package-lock.json
-          # if you use yarn, remove yarn.lock and node_modules instead:
-          # rm -rf node_modules yarn.lock
 
       - name: Install JS dependencies
         run: npm ci
 
       - name: Debug: show installed react-native / metro versions
         run: |
-          echo "react-native version:"
-          node -e "console.log(require('./package.json').dependencies['react-native']||require('./package.json').devDependencies['react-native'])"
-          echo "metro versions (if present):"
+          echo "react-native version from package.json:"
+          node -e "console.log(require('./package.json').dependencies?.['react-native'] || require('./package.json').devDependencies?.['react-native'])"
+          echo
+          echo "metro installed tree (may be nested):"
           npm ls metro || true
           npm ls metro-config || true
 
