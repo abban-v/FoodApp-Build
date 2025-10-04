@@ -2,14 +2,9 @@ name: Build Android App
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
-  workflow_dispatch:
-
 jobs:
   build:
     runs-on: ubuntu-latest
-    
     steps:
       - uses: actions/checkout@v4
       
@@ -23,19 +18,8 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20.x'
+          node-version: '20'
           cache: npm
-      
-      - name: Debug Node and npm
-        run: |
-          echo "which node: $(which node)"
-          node -v
-          npm -v
-      
-      - name: Clean npm cache
-        run: |
-          npm cache clean --force
-          rm -rf node_modules
       
       - name: Install dependencies
         run: npm ci
@@ -43,71 +27,14 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x android/gradlew
       
-      - name: Cache Gradle packages
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
-      
-      - name: Install Android SDK Build Tools and NDK
-        uses: android-actions/setup-android@v2
-        with:
-          api-level: 33
-          build-tools: 33.0.2
-          ndk: 27.1.12297006
-      
-      - name: Bundle JS and Build Release APK
+      - name: Clean and Build Release APK
         run: |
-          mkdir -p android/app/src/main/assets
-          mkdir -p android/app/src/main/res
-          npx react-native bundle \
-            --platform android \
-            --dev false \
-            --entry-file index.js \
-            --bundle-output android/app/src/main/assets/index.android.bundle \
-            --assets-dest android/app/src/main/res
-          export NODE_BINARY=$(which node)
-          echo "Using NODE_BINARY: $NODE_BINARY"
           cd android
           ./gradlew clean
           ./gradlew assembleRelease --no-daemon --stacktrace
       
-      - name: Get APK info
-        id: apk_info
-        run: |
-          APK_PATH="android/app/build/outputs/apk/release/app-release.apk"
-          if [ -f "$APK_PATH" ]; then
-            APK_SIZE=$(du -h "$APK_PATH" | cut -f1)
-            echo "size=$APK_SIZE" >> $GITHUB_OUTPUT
-            echo "path=$APK_PATH" >> $GITHUB_OUTPUT
-            echo "APK built successfully - Size: $APK_SIZE"
-          else
-            echo "size=not_found" >> $GITHUB_OUTPUT
-            echo "path=$APK_PATH" >> $GITHUB_OUTPUT
-            echo "APK not found at expected path"
-            exit 1
-          fi
-      
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-${{ github.sha }}
-          path: ${{ steps.apk_info.outputs.path }}
-          retention-days: 30
-          if-no-files-found: error
-      
-      - name: Comment build info on PR
-        if: github.event_name == 'pull_request' && steps.apk_info.outputs.size != 'not_found'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `✅ **Android APK Built Successfully!**\n\n📦 **Size:** ${{ steps.apk_info.outputs.size }}\n🔗 Download from [workflow artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\n\n_Commit: \`${{ github.sha }}\`_`
-            })
+          name: app-release
+          path: android/app/build/outputs/apk/release/app-release.apk
