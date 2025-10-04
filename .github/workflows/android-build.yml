@@ -20,13 +20,8 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18.16.0'
+          node-version: '18'
           cache: 'npm'
-
-      - name: Clean npm cache & remove lockfile/node_modules
-        run: |
-          npm cache clean --force
-          rm -rf node_modules package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -36,17 +31,6 @@ jobs:
 
       - name: Bundle JS & Build Release APK
         run: |
-          # generate JS bundle and assets (so APK doesn't need Metro)
-          mkdir -p android/app/src/main/assets
-          mkdir -p android/app/src/main/res
-          npx react-native bundle \
-            --platform android \
-            --dev false \
-            --entry-file index.js \
-            --bundle-output android/app/src/main/assets/index.android.bundle \
-            --assets-dest android/app/src/main/res
-
-          # build release APK (bundled JS will be included)
           cd android
           ./gradlew clean
           ./gradlew assembleRelease --no-daemon --stacktrace
