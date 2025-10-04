@@ -1,4 +1,4 @@
-name: Build Android App
+name: Build Android Release APK
 
 on:
   push:
@@ -10,6 +10,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Set up JDK 17
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -17,26 +18,45 @@ jobs:
           distribution: 'temurin'
           cache: 'gradle'
 
+      # Set up Node.js
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
           cache: 'npm'
 
+      # Install npm dependencies
       - name: Install dependencies
-        run: npm ci   # safer & faster than npm install in CI
+        run: npm ci
 
+      # Make gradlew executable
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
-      - name: Clean and Build Debug APK
+      # Build Release APK
+      - name: Build Release APK
+        env:
+          # Optional: use these if you want to sign the APK
+          # REACT_NATIVE_RELEASE_STORE_FILE: ${{ secrets.ANDROID_KEYSTORE_FILE }}
+          # REACT_NATIVE_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          # REACT_NATIVE_RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          # REACT_NATIVE_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           cd android
-          ./gradlew clean   # ensures fresh BuildConfig & Kotlin compile
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          # Make sure the JS bundle is generated and packaged
+          npx react-native bundle \
+            --platform android \
+            --dev false \
+            --entry-file index.js \
+            --bundle-output app/src/main/assets/index.android.bundle \
+            --assets-dest app/src/main/res
+          
+          ./gradlew clean
+          ./gradlew assembleRelease --no-daemon --stacktrace
 
-      - name: Upload APK as artifact
+      # Upload the signed/unsigned release APK as artifact
+      - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: app-release
+          path: android/app/build/outputs/apk/release/app-release.apk
