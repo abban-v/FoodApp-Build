@@ -1,16 +1,14 @@
-name: Build Android Release APK
+name: Build Android App
 
 on:
   push:
     branches: [ "main" ]
-  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -19,69 +17,36 @@ jobs:
           distribution: 'temurin'
           cache: 'gradle'
 
-      - name: Set up Node.js (use Node 20 to avoid toReversed issues)
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '18'
           cache: 'npm'
 
-      - name: Debug: show node & npm & npx versions and PATH
-        run: |
-          echo "PATH: $PATH"
-          echo "which node: $(which node)"
-          node -v
-          npm -v
-          npx --version
-
-      - name: Clean npm cache & remove modules (fresh install)
-        run: |
-          npm cache clean --force
-          rm -rf node_modules package-lock.json
-
-      - name: Install JS dependencies
+      - name: Install dependencies
         run: npm ci
 
-      - name: Debug: show installed react-native / metro versions
-        run: |
-          echo "react-native version from package.json:"
-          node -e "console.log(require('./package.json').dependencies?.['react-native'] || require('./package.json').devDependencies?.['react-native'])"
-          echo
-          echo "metro installed tree (may be nested):"
-          npm ls metro || true
-          npm ls metro-config || true
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
 
-      - name: Pre-bundle React Native JS for Android (using CI node)
+      - name: Bundle JS & Build Release APK
         run: |
+          # generate JS bundle and assets (so APK doesn't need Metro)
           mkdir -p android/app/src/main/assets
           mkdir -p android/app/src/main/res
-          echo "Pre-bundle start — Node: $(node -v)"
           npx react-native bundle \
             --platform android \
             --dev false \
             --entry-file index.js \
             --bundle-output android/app/src/main/assets/index.android.bundle \
             --assets-dest android/app/src/main/res
-          echo "Pre-bundle finished"
 
-      - name: Install Android SDK / Build Tools / NDK
-        uses: android-actions/setup-android@v2
-        with:
-          api-level: 33
-          build-tools: 33.0.2
-          ndk: 27.1.12297006
-
-      - name: Make gradlew executable
-        run: chmod +x android/gradlew
-
-      - name: Build Release APK
-        run: |
-          export NODE_BINARY=$(which node)
-          echo "Using NODE_BINARY: $NODE_BINARY"
+          # build release APK (bundled JS will be included)
           cd android
           ./gradlew clean
           ./gradlew assembleRelease --no-daemon --stacktrace
 
-      - name: Upload Release APK artifact
+      - name: Upload Release APK as artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-release
