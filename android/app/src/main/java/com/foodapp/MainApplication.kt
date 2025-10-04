@@ -20,10 +20,10 @@ class MainApplication : Application(), ReactApplication {
 
         override fun getJSMainModuleName(): String = "index"
 
-        override fun getUseDeveloperSupport(): Boolean = BuildConfig.DEBUG
+        override fun getUseDeveloperSupport(): Boolean = true // Hardcoded to true for debug
 
-        override val isNewArchitectureEnabled: Boolean = BuildConfig.IS_NEW_ARCHITECTURE_ENABLED
-        override val isHermesEnabled: Boolean = BuildConfig.IS_HERMES_ENABLED
+        override val isNewArchitectureEnabled: Boolean = false // Hardcoded to false
+        override val isHermesEnabled: Boolean = true // Hardcoded to true
       }
 
   override val reactHost: ReactHost
@@ -32,7 +32,7 @@ class MainApplication : Application(), ReactApplication {
   override fun onCreate() {
     super.onCreate()
     SoLoader.init(this, false)
-    if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) {
+    if (isNewArchitectureEnabled) {
       // If you opted-in for the New Architecture, we load the native entry point for this app.
       load()
     }
